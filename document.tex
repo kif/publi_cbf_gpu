@@ -1,0 +1,148 @@
+%------------------------------------------------------------------------------
+% Template file for the submission of papers to IUCr journals in LaTeX2e
+% using the iucr document class
+% Copyright 1999-2003 International Union of Crystallography
+% Version 1.2 (11 December 2002)
+%------------------------------------------------------------------------------
+%
+\documentclass[preprint, pdf]{iucr}              % DO NOT DELETE THIS LINE
+                   \def\href#1{\relax}\let\foo\caption
+\ifPDF
+  \RequirePackage{hyperref}
+  \PassOptionsToPackage{pdftex,bookmarksopen,bookmarksnumbered}{hyperref}
+  \voffset=-0.5in
+\fi
+\let\caption\foo
+
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+ \usepackage{amsmath}
+%\usepackage{eps2pdf}
+
+ \paperprodcode{a000000}      % Replace with production code if known
+ \paperref{xx9999}            % Replace xx9999 with reference code if known
+ \papertype{IU}               % Indicate type of article
+ \paperlang{english}          % Can be english, french, german or russian
+ \journalcode{S}             % Indicate the journal to which submitted
+ \journalyr{2017}
+ \journalreceived{\relax}
+ \journalaccepted{\relax}
+ \journalonline{\relax}
+
+\begin{document}                  % DO NOT DELETE THIS LINE
+
+\title{Speeding-up diffraction tomography by accelerating image decompression}
+\shorttitle{GPU decompression of CBF images}
+
+ \cauthor[a]{J.}{Kieffer}{jerome.kieffer@esrf.eu}
+ 
+ \aff[a]{ESRF, The European Synchrotron, CS40220, 38043 \city{Grenoble}
+ Cedex 9, \country{France}}
+ \shortauthor{Kieffer}
+
+
+\keyword{Powder diffraction}
+\keyword{Diffraction imaging}
+\keyword{Pilatus detector}
+\keyword{pyFAI}
+\keyword{FabIO}
+\keyword{Silx}
+
+
+
+\maketitle                        % DO NOT DELETE THIS LINE
+
+\begin{synopsis}
+\end{synopsis}
+
+\begin{abstract}
+
+Diffraction imaging is an X-Ray imaging method which uses the cristallinity
+as signal where a pencil beam is raster-scanned onto a sample and the
+(powder) diffraction signal is recoreded by a large area detector.
+It turns out novel detector are already
+fast enought to fill the temporary storage and data analysis \emph{is} the
+limiting factor for this kind of experiment. 
+
+In this document the author presents a benchmarking of the data analysis
+pipeline of the pipeline used at ESRF ID15a and proposes a new way of
+de-compressing CBF images using 
+
+\end{abstract}
+
+
+\section{Introduction}
+
+Diffraction imaging is an X-Ray imaging method which uses the cristallinity
+as signal where a pencil beam is raster-scanned onto a sample and the
+(powder) diffraction signal is recoreded by a large area detector.
+It turns out the current detector are already
+fast enought to fill the temporary storage and data analysis \emph{is} the
+limiting factor for the whole experiment. 
+
+The analysis of this experiment is often a simple azimuthal regrouping of the
+diffraction image into a powder pattern with the intensity given as function of
+the scattering vector $q=4 \pi sin (2\theta/2)/\lambda$. 
+More complex analysis are possible and often desirable but they are even more
+resource intensive.
+
+We will focus in the second section on the setup of the Materials beamline
+(ID15a) of the ESRF and perform a complete benchmarking of the data analysis 
+pipeline used. This will to highlight various bottle-necks of the data-analysis
+chain.
+To address them, a new CBF image decompression algorithm has been developped and
+is presented in section 3. 
+
+\section{Diffraction imaging data analysis pipeline}
+
+\subsection{Beamline hardware}
+
+\subsubsection{Pilatus3 2M CdTe detector}
+
+The ID15a beamline at ESRF uses mainly a Pilatus3 2M detector with a 1000 $\mu
+m$ CdTe sensor, manufactured by Dectris \cite{dectris}. 
+The detector is made-up of 8\times3 Pilatus modules (100 kpixel each).
+Unlike Silicon-based sensors, there are two Cd-Te waffers bump-bound to every
+Pilatus-module, with a gap of xx pixels between the wafers.
+
+This detector is sold with a detector-PC which is in charge of saving the
+the images. 
+This detector-PC comes with a 10Gbit/s network card and is directly connected to
+the data analysis server.
+
+The detector is advertized to operate at 250 frames per seconds. 
+Each frame being composed of 24 pilatus modules, this makes 2.4 megapixel
+images, which are 32-bits integers (actually the dynamic range is 20 bits).
+If one saves the images as uncompressed raw stream this makes 19.2 gigabits per
+second to transfer.
+
+\subsubsection{Data analysis computer}
+
+
+\section{Parallel decompression of CBF images}
+
+
+
+\section{Outlook}
+
+
+\section{Conclusion}
+
+ 
+\ack{Acknowledgements}
+This work was carried out on the request from the Materials diffraction beamline 
+at ESRF (ID15a), I would like to thank Gavin Vaughan and Marco Di Michiel, the
+scientists of the beamline for providing some test data.
+In the instrumentation services and development division (ISDD) from ESRF  we
+would like to thank V. Armando Solé, head of data analysis unit and leader of 
+the \textit{silx} project, and all our colleagues from the \textit{silx}
+project:
+Thomas Vincent, Henri Payno, Damien Naudet, Pierre Knobel and Valentin Valls for
+their support and ideas.
+
+\bibliographystyle{iucr}
+\bibliography{biblio}
+
+
+\end{document}
