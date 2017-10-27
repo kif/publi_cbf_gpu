@@ -59,15 +59,17 @@
 \begin{abstract}
 
 Diffraction imaging is an X-Ray imaging method which uses the cristallinity
-as signal where a pencil beam is raster-scanned onto a sample and the
-(powder) diffraction signal is recoreded by a large area detector.
-It turns out novel detector are already
-fast enought to fill the temporary storage and data analysis \emph{is} the
-limiting factor for this kind of experiment. 
+as signal. 
+A pencil beam is raster-scanned onto a sample and the (powder) diffraction
+signal is recoreded by a large area detector.
+In this experiment, especially with current pixel-detector, the speed of
+measurement is limited by the storage capacity and online data reduction
+hardly ever done. 
 
-In this document the author presents a benchmarking of the data analysis
-pipeline of the pipeline used at ESRF ID15a and proposes a new way of
-de-compressing CBF images using 
+This contribution presents the benchmarking of a typical data
+analysis pipeline for a diffraction imaging like the one performed at ESRF ID15
+and proposes some disruptive techniques to decode CBF images using the
+computational power of GPUs. 
 
 \end{abstract}
 
@@ -104,7 +106,7 @@ The ID15a beamline at ESRF uses mainly a Pilatus3 2M detector with a 1000 $\mu
 m$ CdTe sensor, manufactured by Dectris \cite{dectris}. 
 The detector is made-up of 8\times3 Pilatus modules (100 kpixel each).
 Unlike Silicon-based sensors, there are two Cd-Te waffers bump-bound to every
-Pilatus-module, with a gap of xx pixels between the wafers.
+Pilatus-module, with a gap of 3 pixels between the wafers.
 
 This detector is sold with a detector-PC which is in charge of saving the
 the images. 
@@ -113,16 +115,63 @@ the data analysis server.
 
 The detector is advertized to operate at 250 frames per seconds. 
 Each frame being composed of 24 pilatus modules, this makes 2.4 megapixel
-images, which are 32-bits integers (actually the dynamic range is 20 bits).
+images, which are 32-bits integers (the dynamic range is only 20 bits).
 If one saves the images as uncompressed raw stream this makes 19.2 gigabits per
 second to transfer.
+Compression is hence mandatory to transfer the acquired data through the 10
+gigabit network interface.
+Dectris uses the CIF binary format (cbf) for their Pilatus detectors with
+byte-offset compression which provides a compression factor close to 4\times. 
+An alternative compression scheme used in novel Eiger detector is the LZ4 but
+the compression factor is much less, arround 2\times (and variable) which makes
+this option un-applicable for operating the Pilatus detector continuously over
+an extended period of time.
 
 \subsubsection{Data analysis computer}
 
+The detector computer is directly attached to the netwok interface of the data
+analysis computer. 
+This data analysis computer has two processors Intel Xeon E5-2643 v3, 6
+cores/socket 20Mbyte of cache, and 128 gigabytes of memory. 
+There is additionnaly two 10-gigabit network cards, a fast SSD, and a Nvidia
+Titan-X graphics, all connected on the PCI-express bus.
 
-\section{Parallel decompression of CBF images}
+\section{Benchmarking of the data-analysis pipeline}
+
+\subsection{Processing of diffraction imaging experiment}
 
 
+import h5py, fabio, pyFAI
+
+def process(list_of_files, result_file, geometry_file, number_of_bins):
+    ai = pyFAI.load(geometry)
+	with h5py.File(result_file) as result:
+		dataset = result.create_dataset((len(list_of_files), number_of_bins,dtype='float32')
+		for index, one_file in enumerate(list_of_files):
+		    with fabio.open(one_file) as fimg:
+		        data = fimg.data
+		    res = ai.integrate1d(data, number_of_bins)
+		    dataset[index] = res.intensity
+	    result['q'] = res.radial
+
+
+\section{Decompression of CBF images}
+
+\subsection{Decompression on the processor}
+
+The core idea of the byte-offset compression is to encode only the difference
+value with the previous pixel and hope this value is small engouh to fit in a
+8-bit (signed) integer. 
+Larger values are coded with a special value (-128) which indicates an exception
+and subsequent 2 bytes are used to store a 16-bit integrer. 
+If the value does not fit in a 16-bit integer a 32-bit exception is signaled and
+the value is coded on 32 bits. 
+With this encoding, one value is coded with variable size on 1, 3 or 7 bytes,
+which makes it very difficult to decompress in a parallel fashion. 
+
+\subsection{Pool of worker startegy} 
+
+\subsection{Parallel decompression on GPU}
 
 \section{Outlook}
 
