@@ -59,17 +59,18 @@
 \begin{abstract}
 
 Diffraction imaging is an X-Ray imaging method which uses the cristallinity
-as signal. 
-A pencil beam is raster-scanned onto a sample and the (powder) diffraction
-signal is recoreded by a large area detector.
-In this experiment, especially with current pixel-detector, the speed of
-measurement is limited by the storage capacity and online data reduction
-hardly ever done. 
+information as signal to create images pixel wise: 
+a pencil beam is raster-scanned onto a sample and the (powder) diffraction
+signal is recorded by a large area detector.
+In this type of experiment, the speed of
+measurement is often limited by the transfer rate or the local storage capacity
+because modern area pixel-detector provide so much data and the data
+reduction can hardly be done in real time.
 
 This contribution presents the benchmarking of a typical data
 analysis pipeline for a diffraction imaging like the one performed at ESRF ID15
 and proposes some disruptive techniques to decode CBF images using the
-computational power of GPUs. 
+computational power of graphics cards. 
 
 \end{abstract}
 
@@ -80,7 +81,7 @@ Diffraction imaging is an X-Ray imaging method which uses the cristallinity
 as signal where a pencil beam is raster-scanned onto a sample and the
 (powder) diffraction signal is recoreded by a large area detector.
 It turns out the current detector are already
-fast enought to fill the temporary storage and data analysis \emph{is} the
+fast enough to fill the temporary storage and data analysis \emph{is} the
 limiting factor for the whole experiment. 
 
 The analysis of this experiment is often a simple azimuthal regrouping of the
@@ -89,11 +90,11 @@ the scattering vector $q=4 \pi sin (2\theta/2)/\lambda$.
 More complex analysis are possible and often desirable but they are even more
 resource intensive.
 
-We will focus in the second section on the setup of the Materials beamline
+We will focus in the second section on the setup of the Materials beam-line
 (ID15a) of the ESRF and perform a complete benchmarking of the data analysis 
 pipeline used. This will to highlight various bottle-necks of the data-analysis
 chain.
-To address them, a new CBF image decompression algorithm has been developped and
+To address them, a new CBF image decompression algorithm has been developed and
 is presented in section 3. 
 
 \section{Diffraction imaging data analysis pipeline}
@@ -102,18 +103,18 @@ is presented in section 3.
 
 \subsubsection{Pilatus3 2M CdTe detector}
 
-The ID15a beamline at ESRF uses mainly a Pilatus3 2M detector with a 1000 $\mu
+The ID15a beam-line at ESRF uses mainly a Pilatus3 2M detector with a 1000 $\mu
 m$ CdTe sensor, manufactured by Dectris \cite{dectris}. 
-The detector is made-up of 8\times3 Pilatus modules (100 kpixel each).
+The detector is made-up of 8x3 Pilatus modules (100 kilopixel each).
 Unlike Silicon-based sensors, there are two Cd-Te waffers bump-bound to every
 Pilatus-module, with a gap of 3 pixels between the wafers.
 
 This detector is sold with a detector-PC which is in charge of saving the
 the images. 
-This detector-PC comes with a 10Gbit/s network card and is directly connected to
-the data analysis server.
+This detector-PC comes with a 10 Gbit/s network card and is directly connected
+to the data analysis server.
 
-The detector is advertized to operate at 250 frames per seconds. 
+The detector is advertised to operate at 250 frames per seconds. 
 Each frame being composed of 24 pilatus modules, this makes 2.4 megapixel
 images, which are 32-bits integers (the dynamic range is only 20 bits).
 If one saves the images as uncompressed raw stream this makes 19.2 gigabits per
@@ -121,41 +122,48 @@ second to transfer.
 Compression is hence mandatory to transfer the acquired data through the 10
 gigabit network interface.
 Dectris uses the CIF binary format (cbf) for their Pilatus detectors with
-byte-offset compression which provides a compression factor close to 4\times. 
+byte-offset compression which provides a compression factor close to 4x. 
 An alternative compression scheme used in novel Eiger detector is the LZ4 but
-the compression factor is much less, arround 2\times (and variable) which makes
+the compression factor is much less, around 2x (and variable) which makes
 this option un-applicable for operating the Pilatus detector continuously over
 an extended period of time.
 
 \subsubsection{Data analysis computer}
 
-The detector computer is directly attached to the netwok interface of the data
+The detector computer is directly attached to the network interface of the data
 analysis computer. 
 This data analysis computer has two processors Intel Xeon E5-2643 v3, 6
-cores/socket 20Mbyte of cache, and 128 gigabytes of memory. 
-There is additionnaly two 10-gigabit network cards, a fast SSD, and a Nvidia
-Titan-X graphics, all connected on the PCI-express bus.
+cores/socket 20 Mbyte of cache, and 128 gigabytes of memory. 
+There is additionnally two 10-gigabit network cards, a fast Intel P3700 SSD,
+and a Nvidia Titan-X graphics card, all connected on the PCI-express bus.
 
 \section{Benchmarking of the data-analysis pipeline}
 
 \subsection{Processing of diffraction imaging experiment}
 
+The pre-processing for diffraction imaging experiments is typically the
+azimuthal integration of the whole image with some mask. 
+This snippet of code  
 
+\label{sequential}
+\begin{verbatim}
 import h5py, fabio, pyFAI
 
 def process(list_of_files, result_file, geometry_file, number_of_bins):
     ai = pyFAI.load(geometry)
-	with h5py.File(result_file) as result:
-		dataset = result.create_dataset((len(list_of_files), number_of_bins,dtype='float32')
-		for index, one_file in enumerate(list_of_files):
-		    with fabio.open(one_file) as fimg:
-		        data = fimg.data
-		    res = ai.integrate1d(data, number_of_bins)
-		    dataset[index] = res.intensity
-	    result['q'] = res.radial
+    with h5py.File(result_file) as result:
+        dataset = result.create_dataset((len(list_of_files),
+        number_of_bins,dtype='float32') 
+        for index, one_file in enumerate(list_of_files):
+            with fabio.open(one_file) as fimg:
+                data = fimg.data
+            res = ai.integrate1d(data, number_of_bins)
+           dataset[index] = res.intensity
+        result['q'] = res.radial
+\end{verbatim}
 
 
-\section{Decompression of CBF images}
+\section{Optimizing the decompression of CBF images}
 
 \subsection{Decompression on the processor}
 
@@ -171,24 +179,208 @@ which makes it very difficult to decompress in a parallel fashion.
 
 \subsection{Pool of worker startegy} 
 
-\subsection{Parallel decompression on GPU}
+A classical stategy in parallel computing is to attribute one type of
+computation to a given compute engine.
+Azimythal being already executed on the graphics-card, it is natural to devote
+the file reading and decompression to the processor.
+A pool of worker (figure \ref{pool}) is set-up using multiple threads for
+reading and decoding the data. 
+The number of worker in this pool is variable which needs to be optimized 
+depending on the computer, especially it depends on the number of processors,
+of core, and the amount of cache on the processor.
+The list of files to be processed is distributed to the pool of file-reader via
+a parallel queue.
+Each worker is an infinite loop, waiting for the name of the file to read 
+on the input queue and putting the decoded data to the output queue after
+reading and decompression.
+Later on, azimuthal integration and data saving, using the Nexus-HDF5
+format\cite{nexus}, is again performed sequencialy.
+
+The table \ref{Performances} provides the number of frames processed per second
+when processing a sample of 1202 frames for various size of the pool:
+1, 2, 4, 6, 8, 12 and 24 workers, all data being already in memory (hot-start).
+This number has to be compared with the frame-rate of the detector of interest:
+250 images per second.
+The performances of the linear pipeline is given as comparison, in this case the
+data can be read from the disk (Intel P3700 SSD, cold-start) or readily
+available in the memory, cached by the operating system (linux).
+
+\begin{table}
+\caption{Average performances (in frames per second) for the azimuthal
+integration of 1202 Pilatus3 2M CdTe images saved in CBF format read from
+SSD (or from memory) on a dual Xeon E5-2642v3 with a Nvidia Titan-X graphics
+card. Best of 5 runs}
+\label{Performances}
+\vspace{1mm}
+\begin{center}
+\begin{tabular}{lcccc}
+Strategy & Readers & Integrator & Data source & frames per second \\
+\hline 
+Sequential & \textsc{cpu} & \textsc{cpu} & \textsc{ssd} & 28.5 \\
+Sequential & \textsc{cpu} & \textsc{gpu} & \textsc{ssd} & 54.5 \\
+\hline 
+Sequential & \textsc{cpu} & \textsc{cpu} & \textsc{mem} & 32.5 \\
+Sequential & \textsc{cpu} & \textsc{gpu} & \textsc{mem} & 75.9 \\
+\hline 
+Pool & 1 & \textsc{gpu} & \textsc{mem} & 171 \\
+Pool & 2 & \textsc{gpu} & \textsc{mem} & 202 \\
+Pool & 3 & \textsc{gpu} & \textsc{mem} & 180 \\
+Pool & 4 & \textsc{gpu} & \textsc{mem} & 206 \\
+Pool & 6 & \textsc{gpu} & \textsc{mem} & 188 \\
+Pool & 12 & \textsc{gpu} & \textsc{mem} & 134 \\
+Pool & 24 & \textsc{gpu} & \textsc{mem} & 90 \\
+\hline 
+OpenCL & \textsc{gpu} & \textsc{gpu} & \textsc{mem} & 256 \\
+\end{tabular}
+\end{center}
+\end{table}
+
+On can notice the optimal performances are reached with a limited number of
+workers in the pool, 2 or 4 workers while the computer has 2x6 cores. 
+There are multiple reasons for this:
+\begin{itemize}
+  \item the main thread is also working: control of the azimuthal integrator
+  and saving of the reduced data in HDF5 format.
+  \item the amount of cache of each of the two processors is 20 megabytes and
+  each frame needs 10 + 2 megabytes to be decoded. More workers means less cache
+  for each of them which is detrimental for performances.
+  \item Python threads are serialized via the ``global interpreter lock'',
+  called \textsc{gil}.
+  While most of the processing performed is done in ``no-\textsc{gil}'' section,
+  more threads makes more likely the probably to have them fighting each other
+  to get access to the \textsc{gil}.
+\end{itemize}
+
+I is frustrating to have a powerful parallel processor on the
+graphics card and seeing the total performance limited by the file-reading
+which is serial.
+
+\subsection{Parallel decompression of CBF images}
+ 
+This section gives a glance of how to decode the byte-offset algorithm, as
+implemented in the CBF file-format, using parallel processors and especially
+graphics processors.
+All threads in a work-group perform the same sequence of operation
+on different data (in a SIMD way).
+This sequence of operation is called ``kernel'' when executed in parallel, it
+looks like a function, written in C-language and operates on a set of data with
+a given size called work-group.
+
+Parallel decompression of byte-offset may be divided in those subsequent steps:
+\begin{itemize}
+  \item search for exception in the input stream (marked as value -128) and
+  register them. Other ``normal" values are simply decoded and stored.
+  \item treat all blocks of exception sequencially: one thread is treating a
+  complete block of adjacent exceptions and multiple treads are processing in
+  parallel muliple blocks.
+  \item As the delta from the previous value is stored, on needs to calculate
+  the cumulative sum of all data. This is performed using a ``scan
+  algorithm''\cite{scan}.
+  \item The position of each value (in the output array) is also calculated
+  using a scan. Technically the two scans are performed simultaneously in our
+  implementation.
+  \item The decoded, after summation, are copied at the proper place in the
+  output array, optionnaly with a conversion to floating point value.
+\end{itemize} 
+
+The implementation of this algorithm is available as part of the silx
+\cite{silx} library and will be released in version v0.7 of the library under a
+MIT license.
+The graphics processor targeted by theis implementation has thousands of cores
+(Nvidia Titan-X: 3072 cores) but this algorithm remains valid regardless the
+number of cores and the implementation provided in OpenCL \cite{pyopencl} has
+been valided on different architectures like integrated graphics processor found
+in laptops and on multi-core central processor.
+
+The strength of this approach reside in the limited amount of
+data to be sent to the graphics card, which allows decompression and
+integration to be performed on the device without additionnal
+transfer over the PCI-express bus (which are always a limiting factor).
+
+The speed-up of this parallel implementation is important (10x),
+in comparison with the single-threaded implementation described previously for
+large images (Pilatus 6M).
+For smaller images, where data are fitting in the processor cache, the serial
+algorithm performs great hence the speed-up of the parallel version is
+rather limited (+50\%). 
+Neverthless, the combination of the parallel cbf-decompression with azimuthal
+integration on the graphics card allows to exceed the 250 frames per second
+imposed by the detector. 
+
+
 
 \section{Outlook}
 
+To be able to inter-connect the decompressed data obtained in the silx library
+with the azimuthal integrator provided by pyFAI, without transfering the data
+back and forth, the silx team had to develop a way to exchange memory
+objects located on the graphics card between libraries. 
+The results obtained in this work show the validity of the concerpt and opens
+the door for interconnecting with many other algorithm.
+Within silx, various tomography and image analysis alogorithms are already
+available and ready to be interfaced in a similar way. 
+In pyFAI, a couple of advanced statistical analysis, recently ported to graphics
+card like median filtering in 2d-integrated data or sigma-clipped avgerage could
+also be good candidates for this kind of interconnection.
+
+The other strength of this approach method is that it hides completely the
+complexity of byte-offset decompression with a simple object decompression
+object (called ``bo'' in the snippet below) which presents the equivelent code 
+to the one in \ref{sequential}. 
+This snippet is only a few lines longer than the sequential implementation and
+uses the same strategy:
+
+\begin{verbatim}
+import h5py, fabio, pyFAI, os
+from silx.opencl.codec.byte_offset import ByteOffset
+
+def process(list_of_files, result_file, geometry_file, number_of_bins):
+    ai = pyFAI.load(geometry_file)
+    data = fabio.open(list_of_files[0]).data
+    res = ai.integrate1d(data, number_of_bins, method="ocl_csr_gpu")
+    engine = ai.engines["ocl_csr_integr"].engine
+    bo = ByteOffset(os.stat(list_of_files[0]).st_size, data.size, ctx=engine.ctx)
+    cbf = fabio.cbfimage.CbfImage()
+    with h5py.File(result_file) as result:
+        dataset = result.create_dataset("intensities", (len(list_of_files), number_of_bins), dtype='float32')
+        result['q'] = res.radial
+        for index, one_file in enumerate(list_of_files):
+            raw = cbf.read(one_file, only_raw=True)
+            dec = bo(raw, as_float=True)
+            dataset[index] = engine.integrate(dec)[0]
+\end{verbatim}
+
+As this script is fully sequential, one can imagine using the pool of worker
+pattern described earlier, controling the decompression and the intrgration done
+on one or multiple GPUs. This allows to reach more than 300 frames per second at
+the price of much more complexity.
 
 \section{Conclusion}
 
+The processor we are using for analysing data have hit the power wall a
+decade ago.
+Since then,  no noticeable increase in performances have been seen on
+sequencially implemented algorithms, causing a bottle-neck in the processing
+pipeline for many beamlines, especially for the one doing diffraction imaging.
+A new parallel implementation of the byte-offset decompression 
+algorithm has been presented, which allows the live reduction of data
+for a diffraction tomography/imaging experiments performed with a Pilatus3 2M
+operating at full speed.
+
  
-\ack{Acknowledgements}
-This work was carried out on the request from the Materials diffraction beamline 
-at ESRF (ID15a), I would like to thank Gavin Vaughan and Marco Di Michiel, the
-scientists of the beamline for providing some test data.
-In the instrumentation services and development division (ISDD) from ESRF  we
-would like to thank V. Armando Solé, head of data analysis unit and leader of 
-the \textit{silx} project, and all our colleagues from the \textit{silx}
+\ack{Acknowledgements:}
+This work was carried out on the request of Gavin Vaughan and Marco Di
+Michiel, scientists on the Materials diffraction beamline at ESRF (ID15a), who
+provided the test dataset composed of 1202 images.
+In the instrumentation services and development division (ISDD) from ESRF I
+would like to acknowledge the help of Sébastien Petitdemange who set-up the
+data-transfer from the detector-computer to the data-analysis computer using NFS
+over RDMA. 
+In the data analyis unit, I would like to thank V.
+Armando Solé, head of data analysis unit and leader of the \textit{silx} project, and all our colleagues from the \textit{silx}
 project:
-Thomas Vincent, Henri Payno, Damien Naudet, Pierre Knobel and Valentin Valls for
-their support and ideas.
+Thomas Vincent, Henri Payno, Damien Naudet, Pierre Knobel, Valentin Valls and
+Pierre Paleo for their support and ideas.
 
 \bibliographystyle{iucr}
 \bibliography{biblio}
