@@ -36,10 +36,11 @@
 \shorttitle{GPU decompression of CBF images}
 
  \cauthor[a]{J.}{Kieffer}{jerome.kieffer@esrf.eu}
+ \author[a]{S.}{Petitdemange}
  
  \aff[a]{ESRF, The European Synchrotron, CS40220, 38043 \city{Grenoble}
  Cedex 9, \country{France}}
- \shortauthor{Kieffer}
+ \shortauthor{Kieffer & Petitdemange}
 
 
 \keyword{Powder diffraction}
@@ -56,8 +57,8 @@
 \maketitle                        % DO NOT DELETE THIS LINE
 
 \begin{synopsis}
-Benchmark of the data-analysis pipeline for XRDCT. CBF byte-offset decompression
-on GPU.
+Benchmark of the data-analysis pipeline for XRD-CT. CBF byte-offset
+decompression on GPU.
 \end{synopsis}
 
 \begin{abstract}
@@ -246,7 +247,7 @@ deviation to this median have been reported in frames per second (or Hertz).
 The first and the third (resp. second and fourth) line report the performances
 in cold- and hot-start.
 This allows us to evaluate the actual read time per frame from the flash
-drive which is 4 millisecond (resp 5 ms).
+drive which is 4 millisecond (resp. 5 ms).
 
 As a consequence, it is impossible to process images at 250 frames per
 second from this SSD as it is not possible to read the (compressed) data
@@ -316,7 +317,17 @@ of strategies have been explored and will be presented.
 A classical strategy in parallel computing is to attribute one type of
 computation to a given compute engine.
 Azimuthal averaging being already executed on the graphics-card, it is natural
-to devote the file reading and decompression to the processor.
+to devote the image decompression to the central processor (CPU).
+
+On lower-end (disk-) drives, the data access is serialized to a single
+I/O queue and the best is to have read operations performed in the main
+thread, then subsequently decompression performed in mutiple threads.
+The SSD used in this experiment is interfaced in PCI-express using the NVME
+protocol \cite{nvme} which provides thousands of parallel queues for reading
+and writing.
+We validated that the performances are actually better when the reading is
+performed within the multiple threads.
+
 A pool of workers (figure \ref{pool}) is set-up using multiple threads for
 reading and decoding the data. 
 The number of worker in this pool is the parameter which needs to be
@@ -342,7 +353,7 @@ of workers pattern.}
 
 
 The table \ref{Performances} provides the number of frames processed per second
-when processing the sample set of frames and variing the size of the
+when processing the sample set of frames and varying the size of the
 pool of readers:
 1, 2, 3, 4, 6, 12 and 24 workers, all data being already in memory
 (hot-start).
