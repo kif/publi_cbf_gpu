@@ -32,15 +32,16 @@
 
 \begin{document}                  % DO NOT DELETE THIS LINE
 
-\title{Real-time diffraction contrast tomography data reduction}
-\shorttitle{GPU decompression of CBF images}
+ \title{Real-time diffraction contrast tomography data reduction}
+ \shorttitle{GPU decompression and integration of CBF images}
 
- \cauthor[a]{J.}{Kieffer}{jerome.kieffer@esrf.eu}
+ \cauthor[a]{J.}{Kieffer}{jerome.kieffer@esrf.fr}{}
  \author[a]{S.}{Petitdemange}
- 
+ \author[a]{T.}{Vincent}
+  
  \aff[a]{ESRF, The European Synchrotron, CS40220, 38043 \city{Grenoble}
  Cedex 9, \country{France}}
- \shortauthor{Kieffer & Petitdemange}
+ \shortauthor{Kieffer & al.}
 
 
 \keyword{Powder diffraction}
@@ -319,28 +320,35 @@ computation to a given compute engine.
 Azimuthal averaging being already executed on the graphics-card, it is natural
 to devote the image decompression to the central processor (CPU).
 
-On lower-end (disk-) drives, the data access is serialized to a single
-I/O queue and the best is to have read operations performed in the main
-thread, then subsequently decompression performed in mutiple threads.
-The SSD used in this experiment is interfaced in PCI-express using the NVME
-protocol \cite{nvme} which provides thousands of parallel queues for reading
-and writing.
-We validated that the performances are actually better when the reading is
-performed within the multiple threads.
+Unlike lower-end (disk-) drives, where the data access is serialized,
+% and the
+%best is to have read operations performed in the main thread, then subsequently
+%decompression performed in mutiple threads. 
+the SSD used in this experiment is interfaced in PCI-express using the NVME
+protocol \cite{nvme} which allows thousands of parallel accesses for reading and
+writing.
+We validated that the performances are actually better when the read step is
+performed within the multiple threads of the pool rather then sequentially on
+this hardware.
 
 A pool of workers (figure \ref{pool}) is set-up using multiple threads for
 reading and decoding the data. 
 The number of worker in this pool is the parameter which needs to be
 optimized depending on the computer, especially as function of the
 number of processors, of cores, and the amount of cache available.
-The list of files to be processed is distributed to the pool of reader via
+The list of files to be processed is distributed to the pool of readers via
 a parallel queue.
-Each worker is an infinite loop running in its own thread, waiting for the name
-of the file to read on the input queue and putting the decompressed data to
-the output queue.
-Later on, azimuthal integration and data saving, using HDF5 is again performed
-sequentially, but the order of the files is not necessary  the same in the
-output queue as it was in the input queue. 
+Each worker, which is implemented as a thread, loops over input filenames
+it gets from the input-queue.
+This queue guarantees each file is processed once, regardless which worker does
+the job.
+After reading the file and decompressing the data, each worker puts the image
+into the output queue.
+Later on, azimuthal integration and data saving, using HDF5, is again performed
+sequentially. 
+As the order of the filenames in the input queue can be different from the order
+of the images in the output queue, due to parallel processing, it is important
+to propagate the index associated with each filename or frame.
 
 \begin{figure}
 \label{pool}
@@ -372,7 +380,8 @@ card. Median over 5 runs and median deviation to the median.}
 \vspace{1mm}
 \begin{center}
 \begin{tabular}{lccccc}
-Strategy & Readers & Integrator & Data source & median fps  & deviation\\
+Strategy & Readers & Integrator & Data source & Median speed (fps)  &
+deviation (fps)\\
 \hline 
 Sequential & \textsc{cpu} & \textsc{cpu} & \textsc{ssd} & 28.2 &0.3\\
 Sequential & \textsc{cpu} & \textsc{gpu} & \textsc{ssd} & 53.1 &1.4\\
@@ -425,32 +434,32 @@ All threads from a work-group perform the same sequence of operation on
 different data (in a SIMD way) which is called a ``kernel'', it looks like a
 function, written in C-language.
 
-Parallel decompression of byte-offset may be divided in those subsequent steps,
+Parallel decompression of byte-offset may be divided in those steps,
 each of them being divided into one or two kernels to be called subsequently:
 \begin{itemize}
-  \item search for exception in the input stream (marked with value -128) and
-  register them. Other ``normal" values are simply decoded and stored.
-  \item treat all sections of exceptions in parallel: Here the workgroup size is
+  \item search for exception in the input stream (marked with the value -128)
+  and register them. Other ``normal" values are simply decoded and stored.
+  \item treat all sections of exceptions in parallel: here the workgroup size is
   one, so one thread is treating a complete section of adjacent exceptions
   and multiple treads are processing in parallel multiple sections. If a thread
   is starting in the middle of an exception sections, it does nothing as this
-  region has to be treated by the thread which starts at the begining of the 
+  region has to be treated by the thread which starts at the beginning of the 
   exception section.
   \item As the difference from the previous pixel value is stored, one needs to
   calculate the cumulative sum of all data. This is performed using a
   ``prefix-sum algorithm'' \cite{scan}.
   \item The position of each value (in the output array) is also calculated
-  using the prefix-sum algorithm: Valid pixel position are set to one in the
+  using the prefix-sum algorithm: valid pixel position are set to one in the
   input and other remains at zero. This algorithm provides the output pixel
   position for any input position.
   Technically the two prefix-sums are performed simultaneously in our
-  implementation.
+  implementation for better performances.
   \item The decoded values, after summation, are copied at the proper place in
   the output array, optionally with a conversion to floating point value to
   ease subsequent processing.
 \end{itemize} 
 
-The implementation of this algorithm is available as part of the silx
+The implementation of this algorithm is available as part of the \textit{silx}
 \cite{silx} library and will be part of the version 0.7.
 While GPUs targeted by this implementation have thousands of
 cores, this algorithm remains valid regardless the
@@ -493,13 +502,13 @@ of the graphics card to this calculation.
 
 \section{Outlook}
 
-To be able to inter-connect the decompressed data obtained in the silx library
-with the azimuthal integrator provided by pyFAI, without transferring the data
-back and forth from the device to the processor, the silx team had to develop a
+To be able to inter-connect the decompressed data obtained in the \textit{silx}
+library with the azimuthal integrator provided by pyFAI, without transferring the data
+back and forth from the device to the processor, the \textit{silx} team had to develop a
 way to exchange memory objects located on the graphics card between libraries. 
 Those results show the validity of the concept and opens the door for
 interconnecting different algorithm including image analysis and
-tomography algoritms which are available as part of the silx library.
+tomography algorithms which are available as part of the \textit{silx} library.
 In pyFAI, a couple of advanced statistical analysis, recently ported to
 OpenCL like median filtering in 2d-integrated data and sigma-clipped
 average could also be good candidates for this kind of direct interconnection.
@@ -568,11 +577,8 @@ provided the test dataset composed of 1202 images taken at their beam-line with
 the Pilatus 2M.
 We would like to thank V. Armando Solé, head of data analysis unit and leader
 of the \textit{silx} project. 
-The parallel byte-offset decompression algorithm has been reviewed by Thomas
-Vincent, architect of \textit{silx}. Without his help, the code would not yet
-run on Apple computers.
-Finally, we would like to acknowledge the contribution of all the members of
-the \textit{silx} project:
+Finally, we would like to acknowledge the contribution of all other members
+of the \textit{silx} project:
 Henri Payno, Damien Naudet, Pierre Knobel, Valentin Valls and
 Pierre Paleo for the great team work.
 
