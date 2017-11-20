@@ -171,7 +171,7 @@ the Pilatus detector continuously over an extended period of time.
 
 \subsubsection{The data analysis computer}
 (Figure \ref{computer}) acts as a NFS (network file server) server over RDMA
-(remote direct memory access) for optimal performances with the detector and is
+(remote direct memory access) for optimal performance with the detector and is
 directly connected to the GPFS (general parallel file-system)
 storage cluster \cite{gpfs}.
 This data analysis computer has two processors Intel Xeon E5-2643 v3, each with 
@@ -244,7 +244,7 @@ Each measurement has been performed five times and the results are reported in
 Table \ref{Performances}.  Only the median framerate  with the median absolute
 deviation to this median have been reported in frames per second (or Hertz).
 
-The first and the third (resp. second and fourth) line report the performances
+The first and the third (resp. second and fourth) line report the performance
 in cold- and hot-start.
 This allows us to evaluate the actual read time per frame from the SSD
 drive which is 4 milliseconds (resp. 5 ms).
@@ -323,7 +323,7 @@ Unlike lower-end (disk-) drives, where the data access is serialized,
 the SSD used in this experiment is interfaced in PCI-express using the NVME
 protocol \cite{nvme} which allows thousands of parallel accesses for reading and
 writing.
-We validated that the performances are actually better when the read step is
+We validated that the performance is actually better when the read step is
 performed with multiple threads rather than sequentially on this hardware.
 
 A pool of workers (figure \ref{pool}) is set-up using multiple threads for
@@ -361,12 +361,12 @@ pool of readers:
 (hot-start).
 This number has to be compared with the framerate of the detector of interest:
 250 fps.
-The performances of the linear pipeline is given as comparison, in this case the
+The performance of the linear pipeline is given as comparison, in this case the
 data can be read from the disk (Intel P3700 SSD, cold-start) or already
 available in memory, cached by the operating system (linux).
 
 \begin{table}
-\caption{Average performances (in fps) for the azimuthal
+\caption{Average performance (in fps) for the azimuthal
 integration of 1202 Pilatus3 2M CdTe images saved in CBF format read from
 SSD (or from memory) on a dual Xeon E5-2642v3 with a Nvidia Titan-X graphics
 card. Median over 5 runs and median deviation to the median.}
@@ -406,7 +406,7 @@ There are multiple reasons for this:
   \item the amount of cache of each processor, which is 20 megabytes, has
   to be compared with the 2 + 10 megabytes for each frame (encoded + decoded).
   More readers means less CPU-cache for each of them which is detrimental
-  to the the performances.
+  to the performance.
   \item Python threads are serialized via the ``global interpreter lock'',
   called \textsc{gil}.
   While most of the processing performed is done in ``no-\textsc{gil}'' section,
@@ -447,7 +447,7 @@ each of them being divided into one or two kernels called subsequently:
   input and other remains at zero. This algorithm provides the output pixel
   position for any input position.
   Technically the two prefix-sums are performed simultaneously in our
-  implementation for better performances.
+  implementation for better performance.
   \item The decoded values, after summation, are copied at the proper place in
   the output array, optionally with a conversion to floating point value to
   ease subsequent processing.
@@ -489,10 +489,10 @@ half the memory (64 GB instead of 128 GB) and a more recent cheaper graphics car
 This desktop computer out-performed the server with more than
 300 frames per second for this benchmark.
 This parallel algorithm is not only faster than the serial version, it is also
-much more stable in performances as the variability (expressed
+much more stable in performance as the variability (expressed
 as the median of absolute difference to the median value) is only of 2 fps on 
 the GPU and twice more for the pool of workers pattern. 
-The stability of the performances on the GPU can be explained by the dedication
+The stability of the performance on the GPU can be explained by the dedication
 of the graphics card to this calculation.
 
 \section{Outlook}
@@ -544,7 +544,7 @@ def process(list_of_files, result_file, geometry_file, number_of_bins):
 
 Processors used for data analysis have hit the power wall more then
 a  decade ago.
-Since then,  no noticeable increase in performances have been seen on
+Since then, no noticeable increase in performance have been seen on
 sequential algorithms, causing a bottle-neck in the processing
 pipeline for many beamlines, especially the one doing diffraction imaging.
 To be able to cope with the stream of data coming from modern detector,
@@ -553,13 +553,13 @@ effective cache and the data should best be kept in memory.
 Two types of parallelization have been evaluated to speed-up the processing.
 The ``pool of workers'' strategy has been evaluated for reading and decoding
 different images  in parallel on different cores.
-It provides additional performances compared to the serial implementation but
+It provides additional performance compared to the serial implementation but
 the speed is not, by far, proportional to the number of cores of the computer,
 probably due to cache congestion.
 
 The first parallel implementation of the byte-offset decompression 
 algorithm is also presented. 
-Leveraging the performances of recent graphics cards, this code allows the reduction
+Leveraging the performance of recent graphics cards, this code allows the reduction
 of data for a diffraction imaging experiment performed at full speed with
 a Pilatus3 2M detector (250 Hz), in real time.
 Moreover this implementation is even faster on newer hardware. 
