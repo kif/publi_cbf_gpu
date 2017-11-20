@@ -194,31 +194,11 @@ associated bandwidth}
 
 The pre-processing for diffraction imaging experiments is typically the
 azimuthal integration of the whole image with some mask. 
-The following snippet of code is a typical example:
+The code snippet of Appendix-\ref{sequentialsnippet} is a typical example:
 each image is read, integrated in a 1D profile and saved in a HDF5 file (here not
 following the Nexus \cite{nexus} convention for the sake of concision in this example).
 
-\begin{minipage}{\linewidth}
-\label{snippet}
-\label{sequential}
-\begin{verbatim}
-import h5py, fabio, pyFAI
-
-def process(list_of_files, result_file, geometry_file, number_of_bins):
-    ai = pyFAI.load(geometry_file)
-    with h5py.File(result_file) as result:
-        dataset = result.create_dataset("intensities"
-                                        (len(list_of_files), number_of_bins),
-                                        dtype='float32') 
-        for index, one_file in enumerate(list_of_files):
-            with fabio.open(one_file) as fimg:
-                res = ai.integrate1d(fimg.data, number_of_bins)
-           dataset[index] = res.intensity
-        result['q'] = res.radial
-\end{verbatim}
-\end{minipage}
-
-This piece of code is written in Python \cite{python} programming language and
+This code snippet is written in Python \cite{python} programming language and
 uses some external libraries:
 \begin{itemize}
   \item {H5Py}: the binding for the HDF5 library in Python \cite{h5py}
@@ -228,8 +208,8 @@ uses some external libraries:
   integration from 2D images to 1D profile \cite{pyFAI}. 
 \end{itemize}
 
-The function ``process" described in this snippet has been used for
-profiling the application (i.e measuring the bottle-neck in performance). 
+The function ``process'' described in this code snippet has been used for
+profiling the application (i.e., measuring the bottle-neck in performance).
 The input dataset is composed of 1202 images in CBF-format coming from an actual
 experiment on ID15a stored on the SSD.
 One should distinguish two cases: when data is only available on the
@@ -268,7 +248,7 @@ importance.
 
 \subsection{Profiling of the data-analysis pipeline}
 
-The snippet of code from section \ref{snippet} has been run in a profiler to
+The snippet of code from Appendix-\ref{sequentialsnippet} presented previously has been run in a profiler to
 measure how much time is spent in every part of the code for a reference
 dataset of 1202 compressed images.
 The code executes on this reference dataset in 43 s and the
@@ -509,13 +489,62 @@ OpenCL like median filtering in 2D-integrated data and sigma-clipped
 average could also be good candidates for this kind of direct interconnection.
 
 The other strength of this approach is that it hides completely the
-complexity of byte-offset decompression with a simple ``decompression
-object'' (called ``bo'' in the snippet below) which presents the equivalent
-code to the one in \ref{sequential}.
-This snippet is only a few lines longer than the sequential implementation and
-uses the same strategy:
+complexity of byte-offset decompression with a simple ``decompression object''.
+In the GPU-based code snippet (Appendix-\ref{parallelsnippet}) this ``decompression object'' is called ``bo''.
+The GPU-base code snippet is equivalent to the sequential one (Appendix-\ref{sequentialsnippet}), it is only a few lines longer and uses the same strategy.
+
+\section{Conclusion}
+
+Processors used for data analysis have hit the power wall more then
+a  decade ago.
+Since then, no noticeable increase in performance have been seen on
+sequential algorithms, causing a bottle-neck in the processing
+pipeline for many beamlines, especially the one doing diffraction imaging.
+To be able to cope with the stream of data coming from modern detector,
+today's fastest SSD drives are not (yet) fast  enough for acting as an
+effective cache and the data should best be kept in memory.
+Two types of parallelization have been evaluated to speed-up the processing.
+The ``pool of workers'' strategy has been evaluated for reading and decoding
+different images  in parallel on different cores.
+It provides additional performance compared to the serial implementation but
+the speed is not, by far, proportional to the number of cores of the computer,
+probably due to cache congestion.
+
+The first parallel implementation of the byte-offset decompression
+algorithm is also presented.
+Leveraging the performance of recent graphics cards, this code allows the reduction
+of data for a diffraction imaging experiment performed at full speed with
+a Pilatus3 2M detector (250 Hz), in real time.
+Moreover this implementation is even faster on newer hardware.
+
+\appendix
+\section{Code snippet for sequential decompression and azimuthal integration}
 
 \begin{minipage}{\linewidth}
+\label{sequentialsnippet}
+\begin{verbatim}
+import h5py, fabio, pyFAI
+
+def process(list_of_files, result_file, geometry_file, number_of_bins):
+    ai = pyFAI.load(geometry_file)
+    with h5py.File(result_file) as result:
+        dataset = result.create_dataset("intensities"
+                                        (len(list_of_files), number_of_bins),
+                                        dtype='float32')
+        for index, one_file in enumerate(list_of_files):
+            with fabio.open(one_file) as fimg:
+                res = ai.integrate1d(fimg.data, number_of_bins)
+           dataset[index] = res.intensity
+        result['q'] = res.radial
+\end{verbatim}
+\end{minipage}
+
+\goodbreak
+
+\section{Code snippet for GPU-based decompression and azimuthal integration}
+
+\begin{minipage}{\linewidth}
+\label{parallelsnippet}
 \begin{verbatim}
 import h5py, fabio, pyFAI, os
 from silx.opencl.codec.byte_offset import ByteOffset
@@ -540,31 +569,8 @@ def process(list_of_files, result_file, geometry_file, number_of_bins):
 \end{verbatim}
 \end{minipage}
 
-\section{Conclusion}
+\goodbreak
 
-Processors used for data analysis have hit the power wall more then
-a  decade ago.
-Since then, no noticeable increase in performance have been seen on
-sequential algorithms, causing a bottle-neck in the processing
-pipeline for many beamlines, especially the one doing diffraction imaging.
-To be able to cope with the stream of data coming from modern detector,
-today's fastest SSD drives are not (yet) fast  enough for acting as an
-effective cache and the data should best be kept in memory.
-Two types of parallelization have been evaluated to speed-up the processing.
-The ``pool of workers'' strategy has been evaluated for reading and decoding
-different images  in parallel on different cores.
-It provides additional performance compared to the serial implementation but
-the speed is not, by far, proportional to the number of cores of the computer,
-probably due to cache congestion.
-
-The first parallel implementation of the byte-offset decompression 
-algorithm is also presented. 
-Leveraging the performance of recent graphics cards, this code allows the reduction
-of data for a diffraction imaging experiment performed at full speed with
-a Pilatus3 2M detector (250 Hz), in real time.
-Moreover this implementation is even faster on newer hardware. 
-
- 
 \ack{Acknowledgements:}
 This work was carried out on the request of Gavin Vaughan and Marco Di
 Michiel, scientists on the Materials diffraction beamline at ESRF (ID15a), who
