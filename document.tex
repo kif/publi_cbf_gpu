@@ -431,24 +431,24 @@ This is called a ``kernel'' and looks like a function written in C-language.
 Parallel decompression of byte-offset may be divided in the following steps,
 each of them being divided into one or two kernels called subsequently:
 \begin{itemize}
-  \item search for exception in the input stream (marked with the value -128)
-  and register them. Other ``normal" values are simply decoded and stored.
-  \item treat all sections of exceptions in parallel: here the workgroup size is
-  one, so one thread is treating a complete section of adjacent exceptions
-  and multiple treads are processing in parallel multiple sections. If a thread
-  is starting in the middle of an exception sections, it does nothing as this
-  region has to be treated by the thread which starts at the beginning of the 
-  exception section.
-  \item As the difference from the previous pixel value is stored, one needs to
-  calculate the cumulative sum of all data. This is performed using a
-  ``prefix-sum algorithm'' \cite{scan}.
-  \item The position of each value (in the output array) is also calculated
-  using the prefix-sum algorithm: valid pixel position are set to one in the
+  \item Search for exceptions in the input stream (marked with the value -128)
+  and register them. Other ``normal'' pixel to pixel difference values are simply decoded and stored.
+  \item Process all registered sections of contiguous exceptions in parallel to decode them and store their value.
+  Here the workgroup size is one, so a single thread is processing a complete
+  section of adjacent exceptions and multiple threads are processing multiple
+  sections in parallel.
+  If a thread starts in the middle of a section of contiguous exceptions,
+  it does nothing as this section has to be processed by the thread
+  which starts at the beginning of this section of contiguous exceptions.
+  \item Compute the cumulative sum of previously stored pixel to pixel difference values.
+  This is performed using a ``prefix-sum algorithm'' \cite{scan}.
+  \item Compute the position of each value (in the output array)
+  using the prefix-sum algorithm: valid pixels position are set to one in the
   input and other remains at zero. This algorithm provides the output pixel
   position for any input position.
   Technically the two prefix-sums are performed simultaneously in our
   implementation for better performance.
-  \item The decoded values, after summation, are copied at the proper place in
+  \item Copy the reconstructed values at the proper place in
   the output array, optionally with a conversion to floating point value to
   ease subsequent processing.
 \end{itemize} 
