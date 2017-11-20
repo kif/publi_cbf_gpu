@@ -404,7 +404,7 @@ There are multiple reasons for this:
   \item the main thread is also working: it controls the azimuthal
   integrator and the saving of the reduced data in HDF5 format.
   \item the amount of cache of each processor, which is 20 megabytes, has
-  to be compared with the 2 + 10 megabytes for each frame (encoded + decoded).
+  to be compared with the 2.5 + 10 megabytes for each frame (encoded + decoded).
   More readers means less CPU-cache for each of them which is detrimental
   to the performance.
   \item Python threads are serialized via the ``global interpreter lock'',
