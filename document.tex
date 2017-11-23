@@ -408,9 +408,9 @@ All threads from a work-group perform the same sequence of operations on
 different data (in a SIMD way).
 This is called a ``kernel'' and looks like a function written in C-language.
 
-Parallel decompression of byte-offset may be divided in the following steps,
+Parallel decompression of byte-offset may be divided in the following steps (Figure \ref{openclsteps}),
 each of them being divided into one or two kernels called subsequently:
-\begin{itemize}
+\begin{enumerate}
   \item Search for exceptions in the input stream (marked with the value -128)
   and register them. Other ``normal'' pixel to pixel difference values are simply decoded and stored.
   \item Process all registered sections of contiguous exceptions in parallel to decode them and store their value.
@@ -431,7 +431,15 @@ each of them being divided into one or two kernels called subsequently:
   \item Copy the reconstructed values at the proper place in
   the output array, optionally with a conversion to floating point value to
   ease subsequent processing.
-\end{itemize} 
+\end{enumerate}
+
+\begin{figure}
+\label{openclsteps}
+\begin{center}
+\includegraphics[width=10cm]{opencl_decompression.eps}
+\caption{CBF decompression in parallel: step by step description of input and output buffers.}
+\end{center}
+\end{figure}
 
 The implementation of this algorithm is available as part of the \textit{silx}
 \cite{silx} library and will be part of the version 0.7.
