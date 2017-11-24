@@ -307,15 +307,17 @@ We validated that the performance is actually better when the read step is
 performed with multiple threads rather than sequentially on this hardware.
 
 A pool of workers (figure \ref{pool}) is set-up using multiple threads for
-reading and decoding the data. 
+reading and decoding the data.  
 The number of workers in this pool is the parameter which needs to be
 optimized depending on the computer, especially as a function of the
 number of processors, of cores, and the amount of cache available.
 The list of files to be processed is distributed to the pool of readers via
 a parallel queue.
-Each worker, which is implemented as a thread, loops over input filenames
-it gets from the input-queue.
-This queue guarantees that each file is processed once, regardless which worker does the job.
+The code snippet used for profiling is reproduced in Appendix-\ref{poolsnippet}.
+Each worker, which is implemented as a thread, loops over input filenames it gets 
+from the input-queue.
+This queue guarantees that each file is processed once, regardless which worker 
+does the job.
 After reading the file and decompressing the data, each worker puts the image
 into the output queue.
 Later on, azimuthal integration and data saving, using HDF5, is again performed
@@ -541,6 +543,74 @@ def process(list_of_files, result_file, geometry_file, number_of_bins):
 
 \goodbreak
 
+\section{Code snippet with a pool of readers and sequential azimuthal
+integration}
+
+\begin{minipage}{\linewidth}
+\label{poolsnippet}
+\begin{verbatim}
+import h5py, fabio, pyFAI
+from threading import Thread, Event
+from queue import Queue
+
+class Reader(Thread):
+    def __init__(self, queue_in, queue_out, quit_event):
+        Thread.__init__(self)
+        self._queue_in = queue_in
+        self._queue_out = queue_out
+        self._quit_event = quit_event
+
+    def run(self):
+        while not self._quit_event.is_set():
+            idx_fname = self._queue_in.get()
+            if idx_fname is None:
+                break
+            idx, fname = idx_fname
+            fimg = fabio.cbfimage.CbfImage()
+            fimg = fimg.read(fname, check_MD5=False)
+            self._queue_out.put((idx, fimg.data))
+            self._queue_in.task_done()
+            fimg = None
+
+def process(list_of_files, result_file, geometry_file, number_of_bins, workers=1):   
+    #prepare the pool of workers:
+    queue_in = Queue()
+    queue_out = Queue()
+    quit_event = Event()
+    pool =  []
+    for _ in range(workers):
+        reader = Reader(queue_in, queue_out, quit_event)
+        reader.start()
+        pool.append(reader)
+    
+    #Send all filename to the queue for processing
+    for idx, fname in enumerate(list_of_files):
+        queue_in.put((idx, fname))
+
+    #Perform the azimuthal integration and saving
+    ai = pyFAI.load(geometry_file)
+    with h5py.File(result_file) as result:
+        dataset = result.create_dataset("intensities", 
+                                        (len(list_of_files), number_of_bins),
+                                        dtype='float32') 
+        for i in list_of_files:
+            idx, data = queue_out.get()
+            res = ai.integrate1d(data, number_of_bins, method="ocl_csr_gpu")
+            dataset[idx] = res.intensity
+            queue_out.task_done()
+        result['q'] = res.radial
+	
+	#Clean up the pool of workers
+    q_in.join()
+    q_out.join()
+    quit_event.set()
+    for _ in range(workers):
+        queue_in.put(None)
+\end{verbatim}
+\end{minipage}
+
+\goodbreak
+
 \section{Code snippet for GPU-based decompression and azimuthal integration}
 
 \begin{minipage}{\linewidth}
@@ -572,10 +642,9 @@ def process(list_of_files, result_file, geometry_file, number_of_bins):
 \goodbreak
 
 \ack{Acknowledgements:}
-This work was carried out on the request of Gavin Vaughan and Marco Di
-Michiel, scientists on the Materials diffraction beamline at ESRF (ID15a), who
-provided the test dataset composed of 1202 images taken at their beamline with
-the Pilatus 2M.
+This work has been sponsored by the Materials diffraction beamline at ESRF
+(ID15a), we would like to thank Gavin Vaughan and Marco Di Michiel for
+providing the test dataset composed of 1202 images.
 We would like to thank V. Armando Solé, head of Data Analysis Unit and leader
 of the \textit{silx} project. 
 Finally, we would like to acknowledge the contribution of all other members
