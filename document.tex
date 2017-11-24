@@ -65,7 +65,7 @@ decompression on GPU.
 \begin{abstract}
 
 Diffraction imaging is an X-Ray imaging method which uses the cristallinity
-information (cell parameter, orientation ) as signal to create an image pixel
+information (cell parameter, orientation) as signal to create an image pixel
 per pixel:
 a pencil beam is raster-scanned onto a sample and the (powder) diffraction
 signal is recorded by a large area detector.
@@ -96,7 +96,7 @@ X-Ray diffraction computed tomography (hereafter XRD-CT, Figure \ref{diff_tomo})
 scanned onto a sample.
 The volumetric information is obtained by rotating the sample in the X-ray beam
 to generate the sinogram.
-The diffraction signal, scattered over a large solid angle is recorded by
+The diffraction signal, scattered over a large solid angle, is recorded by
 an area detector and saved as a stack of images.
 Those images are azimuthal averaged into powder diffraction patterns with the
 intensity given as a function of either the diffraction angle ($2\theta$) or the scattering
@@ -145,9 +145,9 @@ schemes have been developed and are presented in section 3.
 The ID15a beamline at ESRF uses mainly a Pilatus3 2M detector with a 1000 $\mu
 m$ CdTe sensor, manufactured by Dectris \cite{pilatus}. 
 The detector is made-up of 8x3 Pilatus modules (100 kilopixel each).
-Unlike Silicon-based sensors, there are two Cd-Te wafers bump-bound to every
-Pilatus-module, with a gap of 3 pixels between the wafers.
-The gaps between the Piltus modules are the same as the Silicon-based
+Unlike silicon-based sensors, there are two Cd-Te wafers bump-bound to every
+single Pilatus-module, with a gap of 3 pixels between the wafers.
+The gaps between the Pilatus modules are the same as the silicon-based
 detectors, i.e. 7 pixels vertically and 17 pixel horizontally.
 
 This detector is sold with a detector-PC which is in charge of compressing and
@@ -198,18 +198,20 @@ The code snippet of Appendix-\ref{sequentialsnippet} is a typical example:
 each image is read, integrated in a 1D profile and saved in a HDF5 file (here not
 following the Nexus \cite{nexus} convention for the sake of concision in this example).
 
-This code snippet is written in Python \cite{python} programming language and
-uses some external libraries:
+This code snippet is written in Python programming language \cite{python} and
+uses some extra libraries:
 \begin{itemize}
-  \item {H5Py}: the binding for the HDF5 library in Python \cite{h5py}
-  \item{FabIO}: a library for reading most of the X-ray images format
+  \item {H5Py}: for accessing HDF5-files in Python
+  \cite{h5py}
+  \item{FabIO}: for reading most of the X-ray images format
   \cite{fabio}
-  \item{PyFAI}: the library which performs the azimuthal
-  integration from 2D images to 1D profile \cite{pyFAI}. 
+  \item{PyFAI}: for performing the azimuthal
+  integration from 2D images into 1D profiles \cite{pyFAI}. 
 \end{itemize}
 
 The function ``process'' described in this code snippet has been used for
-profiling the application (i.e., measuring the bottle-neck in performance).
+profiling the application (i.e., measuring how much time is spent in each
+part of the code).
 The input dataset is composed of 1202 images in CBF-format coming from an actual
 experiment on ID15a stored on the SSD.
 One should distinguish two cases: when data is only available on the
@@ -259,9 +261,12 @@ The checksum verification is optional in CBF and may simply be ignored.
 The azimuthal integration was originally performed on the processor and could be
 off-loaded to the graphics card, which lowers azimuthal integration time to 13 s.
 As described in \cite{kieffer_ashiotis-proc-euroscipy-2014}, most of the time
-for azimuthal integration on graphics card is spent for the transfer of the raw image to the device.
+for azimuthal integration on graphics card is spent for the transfer of the raw 
+image to the device.
 To speed up the azimuthal integration, the best would be to transfer less data
 to the graphics card, i.e the compressed data and decompress them on the GPU.
+Until now, this approach still remains challenging for unmodified compressed
+format \cite{gompresso}.
 
 Remains the bottle-neck of byte-offset decompression \ldots this algorithm will
 be described in details in the next section and analyzed. 
@@ -284,8 +289,8 @@ bytes, which makes it very difficult to decompress in a parallel fashion.
 
 Since 2004, processors are running at a maximum speed of about 4GHz.
 This means that a serial algorithm like the byte-offset decompression described
-previously is running at the same speed today on a high-end computer as it
-does on a 13 years-old computer.
+previously is running at the same speed on a high-end computer as it
+would on a 13 years-old computer.
 Parallelization is the only way to get the processing done faster and a couple
 of strategies have been explored and will be presented.
 
@@ -397,8 +402,8 @@ There are multiple reasons for this:
 \end{itemize}
 
 It is frustrating to have a powerful parallel processor on the
-graphics card and seeing the total performance limited by the file-reading
- and decompression which is purely serial.
+graphics card and seeing the total performance limited by the file decompression
+which is purely serial. 
 
 \subsection{Parallel decompression of CBF images}
  
@@ -439,7 +444,10 @@ each of them being divided into one or two kernels called subsequently:
 \label{openclsteps}
 \begin{center}
 \includegraphics[width=10cm]{opencl_decompression.eps}
-\caption{CBF decompression in parallel: step by step description of input and output buffers.}
+\caption{CBF decompression in parallel: step by step description of input and 
+output buffers for each step (kernel). Bold values indicate values which have
+been changed in previous step. The grey region correspond to values
+longer than one byte which needs to be sieved out in in the final step.}
 \end{center}
 \end{figure}
 
@@ -496,12 +504,15 @@ interconnecting different algorithms including image analysis and
 tomography algorithms which are available as part of the \textit{silx} library.
 In pyFAI, a couple of advanced statistical analysis, recently ported to
 OpenCL like median filtering in 2D-integrated data and sigma-clipped
-average could also be good candidates for this kind of direct interconnection.
+average, could also be good candidates for this kind of direct interconnection.
 
 The other strength of this approach is that it hides completely the
 complexity of byte-offset decompression with a simple ``decompression object''.
-In the GPU-based code snippet (Appendix-\ref{parallelsnippet}) this ``decompression object'' is called ``bo''.
-The GPU-base code snippet is equivalent to the sequential one (Appendix-\ref{sequentialsnippet}), it is only a few lines longer and uses the same strategy.
+In the GPU-based code snippet (Appendix-\ref{parallelsnippet}) this
+``decompression object'' is called ``bo''. 
+The GPU-base code snippet is equivalent to the sequential one
+(Appendix-\ref{sequentialsnippet}),   it is only a few lines longer and uses the
+same strategy. 
 
 \section{Conclusion}
 
@@ -529,7 +540,6 @@ Moreover this implementation is even faster on newer hardware.
 
 \appendix
 \section{Code snippet for sequential decompression and azimuthal integration}
-
 \begin{minipage}{\linewidth}
 \label{sequentialsnippet}
 \begin{verbatim}
@@ -553,7 +563,6 @@ def process(list_of_files, result_file, geometry_file, number_of_bins):
 
 \section{Code snippet with a pool of readers and sequential azimuthal
 integration}
-
 \begin{minipage}{\linewidth}
 \label{poolsnippet}
 \begin{verbatim}
@@ -601,16 +610,16 @@ def process(list_of_files, result_file, geometry_file, number_of_bins, workers=1
         dataset = result.create_dataset("intensities", 
                                         (len(list_of_files), number_of_bins),
                                         dtype='float32') 
-        for i in list_of_files:
+        for _ in list_of_files:
             idx, data = queue_out.get()
             res = ai.integrate1d(data, number_of_bins, method="ocl_csr_gpu")
             dataset[idx] = res.intensity
             queue_out.task_done()
         result['q'] = res.radial
-	
-	#Clean up the pool of workers
-    q_in.join()
-    q_out.join()
+        
+    #Clean up the pool of workers
+    queue_in.join()
+    queue_out.join()
     quit_event.set()
     for _ in range(workers):
         queue_in.put(None)
@@ -620,7 +629,6 @@ def process(list_of_files, result_file, geometry_file, number_of_bins, workers=1
 \goodbreak
 
 \section{Code snippet for GPU-based decompression and azimuthal integration}
-
 \begin{minipage}{\linewidth}
 \label{parallelsnippet}
 \begin{verbatim}
