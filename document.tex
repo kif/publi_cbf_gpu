@@ -21,7 +21,7 @@
 %\usepackage{eps2pdf}
 
  \paperprodcode{a000000}      % Replace with production code if known
- \paperref{xx9999}            % Replace xx9999 with reference code if known
+ \paperref{co5098}            % Replace xx9999 with reference code if known
  \papertype{IU}               % Indicate type of article
  \paperlang{english}          % Can be english, french, german or russian
  \journalcode{S}             % Indicate the journal to which submitted
@@ -32,7 +32,7 @@
 
 \begin{document}                  % DO NOT DELETE THIS LINE
 
- \title{Real-time diffraction contrast tomography data reduction}
+ \title{Real-time diffraction computed tomography data reduction}
  \shorttitle{GPU decompression and integration of CBF images}
 
  \cauthor[a]{J.}{Kieffer}{jerome.kieffer@esrf.fr}{}
@@ -66,7 +66,7 @@ decompression on GPU.
 
 Diffraction imaging is an X-Ray imaging method which uses the cristallinity
 information (cell parameter, orientation) as signal to create an image pixel
-per pixel:
+by pixel:
 a pencil beam is raster-scanned onto a sample and the (powder) diffraction
 signal is recorded by a large area detector.
 With the flux provided by third generation synchrotrons and the speed of
@@ -101,7 +101,7 @@ an area detector and saved as a stack of images.
 Those images are azimuthal averaged into powder diffraction patterns with the
 intensity given as a function of either the diffraction angle ($2\theta$) or the scattering
 vector $q=4 \pi sin (2\theta/2)/\lambda$.
-The sinogram is built, pixel per pixel, by storing this pattern as a function of
+The sinogram is built, pixel by pixel, by storing this pattern as a function of
 the sample position: translations and rotation.
 The tomogram is finally reconstructed from the back-projection of the sinogram.  
 
@@ -155,7 +155,7 @@ saving the images on the network.
 This detector-PC comes with a 10 Gbit/s network card and is directly connected
 to the data analysis server.
 
-The detector is advertised to operate at 250 frames per second.
+The detector is advertised as operating at 250 frames per second.
 Each frame has 2.4 megapixels, stored as 32-bits integers (the dynamic range is
 only 20 bits).
 At full speed, the raw (uncompressed) stream represents hence 19.2 gigabits per
@@ -412,7 +412,7 @@ decompression on massively parallel processors like graphics processors
 (GPU) using the OpenCL \cite{opencl} programming language.
 In those devices, threads are grouped in ``work-groups'' of a given size.
 All threads from a work-group perform the same sequence of operations on
-different data (in a SIMD way).
+different data (in a single instruction, multiple data way).
 This is called a ``kernel'' and looks like a function written in C-language.
 
 Parallel decompression of byte-offset may be divided in the following steps (Figure \ref{openclsteps}),
@@ -502,7 +502,7 @@ way to exchange memory objects located on the graphics card between libraries.
 Those results show the validity of the concept and opens the door for
 interconnecting different algorithms including image analysis and
 tomography algorithms which are available as part of the \textit{silx} library.
-In pyFAI, a couple of advanced statistical analysis, recently ported to
+In pyFAI, a couple of advanced statistical analysis tools, recently ported to
 OpenCL like median filtering in 2D-integrated data and sigma-clipped
 average, could also be good candidates for this kind of direct interconnection.
 
@@ -539,7 +539,8 @@ a Pilatus3 2M detector (250 Hz), in real time.
 Moreover this implementation is even faster on newer hardware.
 
 \appendix
-\section{Code snippet for sequential decompression and azimuthal integration}
+\section{Code snippet used for profiling the sequential decompression and
+azimuthal integration approach}
 \begin{minipage}{\linewidth}
 \label{sequentialsnippet}
 \begin{verbatim}
